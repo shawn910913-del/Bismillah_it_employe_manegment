@@ -303,7 +303,13 @@ function renderEmpList() {
         .filter(u => u.role === 'employee')
         .map(u => {
             const count = (statsData.byEmployee || []).find(e => e.employee_name === u.display_name)?.count || 0;
-            return `<div class="employee-item" style="cursor:pointer" onclick="fetchEmpAccounts('${esc(u.display_name)}')"><span class="name">&#128100; ${esc(u.display_name)}</span><span class="count">${count} accounts</span></div>`;
+            return `<div class="employee-item" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between">
+                <div onclick="fetchEmpAccounts('${esc(u.display_name)}')" style="flex:1;display:flex;align-items:center;justify-content:space-between">
+                    <span class="name">&#128100; ${esc(u.display_name)}</span>
+                    <span class="count">${count} accounts</span>
+                </div>
+                <button class="btn btn-sm btn-danger" style="margin-left:10px;padding:4px 10px;font-size:.76rem" onclick="event.stopPropagation();resetEmployee('${esc(u.display_name)}')">&#128465; Reset</button>
+            </div>`;
         })
         .join('');
     }
@@ -337,6 +343,20 @@ async function deleteEmpAccounts(name) {
             document.getElementById('employeeDetail').style.display = 'none';
         }
     } catch (e) { toast('Error deleting accounts', 'error'); }
+}
+
+// Reset employee data from the employee list
+async function resetEmployee(name) {
+    if (!confirm(`⚠️ Reset ALL accounts for "${name}"?\nThis will delete all their submitted accounts. This cannot be undone!`)) return;
+    try {
+        const r = await fetch(`${SERVER}/api/accounts/employee/${encodeURIComponent(name)}`, { method: 'DELETE', headers: hdr() });
+        const d = await r.json();
+        toast(d.message || `${name}'s data has been reset`, d.success ? 'success' : 'error');
+        if (d.success) {
+            await refreshAll();
+            document.getElementById('employeeDetail').style.display = 'none';
+        }
+    } catch (e) { toast('Error resetting employee data', 'error'); }
 }
 
 function renderUsers(users) {
