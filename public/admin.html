@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - 2FA Accounts</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .user-form{display:grid;grid-template-columns:1fr 1fr 1fr auto auto;gap:10px;align-items:end;margin-bottom:16px}
+        .user-form .form-group input,.user-form select{padding:9px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-bright);font-size:.9rem;outline:none}
+        .user-form .form-group input:focus,.user-form select:focus{border-color:var(--blue)}
+        .user-form select{appearance:none;cursor:pointer}
+        .user-table td .actions{display:flex;gap:6px}
+        .user-table td .actions button{padding:4px 10px;font-size:.76rem;border-radius:6px;border:none;cursor:pointer;font-weight:600;transition:.2s}
+        .user-table td .actions button:active{transform:scale(.95)}
+        .btn-danger{background:#b71c1c;color:#fff}.btn-danger:hover{background:#e53935}
+        .btn-warn{background:#e65100;color:#fff}.btn-warn:hover{background:#ff6d00}
+        .btn-teal{background:#00695c;color:#fff}.btn-teal:hover{background:#00897b}
+        .badge-active{background:rgba(0,230,118,.15);color:var(--green);padding:2px 10px;border-radius:10px;font-size:.78rem;border:1px solid var(--green)}
+        .badge-inactive{background:rgba(233,69,96,.15);color:var(--accent);padding:2px 10px;border-radius:10px;font-size:.78rem;border:1px solid var(--accent)}
+        .badge-role{background:rgba(68,138,255,.15);color:var(--blue);padding:2px 10px;border-radius:10px;font-size:.78rem;border:1px solid var(--blue)}
+        .download-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+        .dup-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+        .dup-card .emp-name{color:var(--blue);font-weight:600;font-size:1rem;margin-bottom:6px}
+        .dup-card .dup-count{color:var(--accent);font-size:1.5rem;font-weight:700}
+        .dup-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:18px}
+        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:none;align-items:center;justify-content:center}
+        .modal-overlay.show{display:flex}
+        .modal-box{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:28px;width:380px;max-width:92vw;box-shadow:0 8px 40px rgba(0,0,0,.5)}
+        .modal-box h3{color:var(--text-bright);margin-bottom:16px;font-size:1.1rem}
+        .modal-box .field{margin-bottom:14px}
+        .modal-box .field label{display:block;font-size:.78rem;color:var(--text-secondary);text-transform:uppercase;margin-bottom:5px}
+        .modal-box .field input{width:100%;padding:10px 13px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-bright);font-size:.9rem;outline:none}
+        .modal-box .field input:focus{border-color:var(--blue)}
+        .modal-box .btn-row{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
+        @media(max-width:768px){.user-form{grid-template-columns:1fr}}
+    </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+    <h1 style="cursor:pointer" onclick="switchTab('accounts')">&#128737; Admin <span>Dashboard</span></h1>
+    <div style="display:flex;gap:10px;align-items:center">
+        <span id="adminName" style="color:var(--green);font-size:.88rem;font-weight:600"></span>
+        <button class="btn btn-sm btn-success" onclick="switchTab('accounts')" title="Home">&#127968; Home</button>
+        <button class="btn btn-sm btn-blue" onclick="refreshAll()">&#8635; Refresh</button>
+        <button class="btn btn-sm btn-primary" onclick="doLogout()">Logout</button>
+    </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- PASSWORD CHANGE MODAL -->
+<div class="modal-overlay" id="pwModal">
+    <div class="modal-box">
+        <h3>&#128272; Change Password</h3>
+        <input type="hidden" id="pwUserId">
+        <p style="color:var(--text-secondary);font-size:.85rem;margin-bottom:14px">Changing for: <strong id="pwUserLabel" style="color:var(--text-bright)"></strong></p>
+        <div class="field">
+            <label>New Password</label>
+            <input type="text" id="pwNewPass" placeholder="Enter new password" autocomplete="off">
+        </div>
+        <div class="btn-row">
+            <button class="btn btn-sm btn-blue" onclick="closePwModal()">Cancel</button>
+            <button class="btn btn-sm btn-primary" onclick="savePw()">Save</button>
+        </div>
+    </div>
+</div>
+
+<div class="container wide">
+
+    <!-- STATS -->
+    <div class="stats-row" id="statsRow">
+        <div class="stat-box green">
+            <div class="stat-number" id="statTotal">0</div>
+            <div class="stat-label">Total Accounts</div>
+        </div>
+        <div class="stat-box yellow">
+            <div class="stat-number" id="statDuplicates">0</div>
+            <div class="stat-label">Duplicate Attempts</div>
+        </div>
+        <div class="stat-box blue">
+            <div class="stat-number" id="statEmployees">0</div>
+            <div class="stat-label">Employees</div>
+        </div>
+    </div>
+
+    <!-- TABS -->
+    <div class="tab-nav">
+        <button class="tab-btn active" data-tab="accounts" onclick="switchTab('accounts')">&#128203; All Accounts</button>
+        <button class="tab-btn" data-tab="employees" onclick="switchTab('employees')">&#128101; By Employee</button>
+        <button class="tab-btn" data-tab="duplicates" onclick="switchTab('duplicates')">&#9888; Duplicates</button>
+        <button class="tab-btn" data-tab="users" onclick="switchTab('users')">&#128100; Manage Users</button>
+        <button class="tab-btn" data-tab="export" onclick="switchTab('export')">&#128229; Export</button>
+    </div>
+
+    <!-- TAB: ALL ACCOUNTS -->
+    <div class="tab-content active" id="tab-accounts">
+        <div class="card">
+            <div class="flex-between mb-10">
+                <div class="card-title" style="margin:0;border:none;padding:0">&#128203; All Submitted Accounts</div>
+                <div class="download-row">
+                    <button class="btn btn-sm btn-success" onclick="copyAllAccounts()">&#128203; Copy All</button>
+                    <button class="btn btn-sm btn-blue" onclick="downloadXlsx()">&#128229; Download XLSX</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteAllAccounts()" style="margin-left:6px">&#128465; Delete All</button>
+                </div>
+            </div>
+            <div class="search-bar">
+                <input type="text" id="searchInput" placeholder="Search by username, employee..." oninput="filterAccounts()">
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead><tr><th>#</th><th>Username</th><th>Password</th><th>2FA Hash</th><th>Employee</th><th>Time</th></tr></thead>
+                    <tbody id="accountsBody"><tr><td colspan="6" class="text-center" style="padding:30px;color:#666">Loading...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB: BY EMPLOYEE -->
+    <div class="tab-content" id="tab-employees">
+        <div class="card">
+            <div class="card-title">&#128101; Submissions By Employee</div>
+            <div class="employee-list" id="employeeList"><div class="text-center" style="padding:20px;color:#666">Loading...</div></div>
+        </div>
+        <div class="card" id="employeeDetail" style="display:none">
+            <div class="flex-between mb-10">
+                <div class="card-title" style="margin:0;border:none;padding:0">&#128100; <span id="detailName">-</span>'s Accounts</div>
+                <button class="btn btn-sm btn-success" onclick="copyEmpAccounts()">&#128203; Copy</button>
+                <!-- Delete All for This Employee button will be injected by JS -->
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead><tr><th>#</th><th>Username</th><th>Password</th><th>2FA Hash</th><th>Time</th></tr></thead>
+                    <tbody id="empAccountsBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB: DUPLICATES -->
+    <div class="tab-content" id="tab-duplicates">
+        <div class="card">
+            <div class="card-title">&#9888; Duplicate Submit Attempts Per Employee</div>
+            <div class="dup-grid" id="dupGrid"><div class="text-center" style="padding:20px;color:#666">Loading...</div></div>
+        </div>
+        <div class="card">
+            <div class="card-title">&#128203; Recent Duplicate Attempts</div>
+            <div class="table-wrapper">
+                <table>
+                    <thead><tr><th>#</th><th>Username Attempted</th><th>Employee</th><th>Time</th></tr></thead>
+                    <tbody id="dupTableBody"><tr><td colspan="4" class="text-center" style="padding:30px;color:#666">Loading...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB: MANAGE USERS -->
+    <div class="tab-content" id="tab-users">
+        <div class="card">
+            <div class="card-title">&#10010; Create New User</div>
+            <div class="user-form">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="nuUser" placeholder="e.g. rasel01" autocomplete="off" spellcheck="false">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="text" id="nuPass" placeholder="e.g. pass123" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label>Display Name</label>
+                    <input type="text" id="nuName" placeholder="e.g. Rasel" autocomplete="off" spellcheck="false">
+                </div>
+                <div class="form-group">
+                    <label>Role</label>
+                    <select id="nuRole">
+                        <option value="employee">Employee</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" onclick="createUser()" style="height:40px">&#10010; Create</button>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-title">&#128101; All Users</div>
+            <div class="table-wrapper">
+                <table class="user-table">
+                    <thead><tr><th>ID</th><th>Username</th><th>Display Name</th><th>Role</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
+                    <tbody id="usersBody"><tr><td colspan="7" class="text-center" style="padding:30px;color:#666">Loading...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB: EXPORT -->
+    <div class="tab-content" id="tab-export">
+        <div class="card">
+            <div class="flex-between mb-10">
+                <div class="card-title" style="margin:0;border:none;padding:0">&#128229; Export All Accounts</div>
+                <div class="download-row">
+                    <button class="btn btn-success" onclick="copyExportText()">&#128203; COPY ALL</button>
+                    <button class="btn btn-blue" onclick="downloadXlsx()">&#128229; DOWNLOAD XLSX</button>
+                </div>
+            </div>
+            <p style="color:var(--text-secondary);font-size:.85rem;margin-bottom:12px">
+                Format: <code style="color:var(--green);background:#0a0a14;padding:2px 8px;border-radius:4px">username	password	2FA_HASH</code> (tab-separated)
+            </p>
+            <div class="copy-area">
+                <textarea id="exportArea" readonly placeholder="No accounts yet..."></textarea>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+// ============ CONFIG ============
+const SERVER = window.location.origin;
+let TOKEN = localStorage.getItem('admin_token') || '';
+let ADMIN_USER = null;
+let allAccounts = [];
+let currentEmpAccounts = [];
+let statsData = {};
+
+// ============ AUTH CHECK ============
+(async function init() {
+    if (!TOKEN) { window.location.href = '/'; return; }
+    try {
+        const r = await fetch(`${SERVER}/api/auth/me`, { headers: hdr() });
+        const d = await r.json();
+        if (!d.success || d.user.role !== 'admin') { window.location.href = '/'; return; }
+        ADMIN_USER = d.user;
+        document.getElementById('adminName').textContent = ADMIN_USER.display_name;
+    } catch (e) { window.location.href = '/'; return; }
+    await refreshAll();
+})();
+
+function hdr() { return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${TOKEN}` }; }
+
+function doLogout() {
+    fetch(`${SERVER}/api/auth/logout`, { method: 'POST', headers: hdr() }).catch(() => {});
+    localStorage.removeItem('admin_token');
+    localStorage.removeItem('admin_user');
+    window.location.href = '/';
+}
+
+// ============ FETCH DATA ============
+async function fetchAccounts() {
+    try { const r = await fetch(`${SERVER}/api/accounts`, { headers: hdr() }); allAccounts = await r.json(); renderAccounts(allAccounts); } catch (e) { toast('Failed to fetch accounts', 'error'); }
+}
+
+async function fetchStats() {
+    try { const r = await fetch(`${SERVER}/api/stats`, { headers: hdr() }); statsData = await r.json(); renderStats(); renderEmpList(); } catch (e) { toast('Failed to fetch stats', 'error'); }
+}
+
+async function fetchExport() {
+    try { const r = await fetch(`${SERVER}/api/export`, { headers: hdr() }); document.getElementById('exportArea').value = await r.text(); } catch (e) {}
+}
+
+async function fetchUsers() {
+    try {
+        const r = await fetch(`${SERVER}/api/users`, { headers: hdr() });
+        window.allUsers = await r.json();
+        renderUsers(allUsers);
+        renderEmpList(); // update employee list after fetching users
+    } catch (e) { toast('Failed to fetch users', 'error'); }
+}
+
+async function fetchEmpAccounts(name) {
+    try { const r = await fetch(`${SERVER}/api/accounts/employee/${encodeURIComponent(name)}`, { headers: hdr() }); currentEmpAccounts = await r.json(); renderEmpDetail(name); } catch (e) { toast('Failed to fetch', 'error'); }
+}
+
+async function refreshAll() {
+    await Promise.all([fetchAccounts(), fetchStats(), fetchExport(), fetchUsers(), fetchDuplicates()]);
+}
+
+// ============ RENDER ============
+function renderStats() {
+    document.getElementById('statTotal').textContent = statsData.totalAccounts || 0;
+    document.getElementById('statDuplicates').textContent = statsData.totalDuplicateAttempts || 0;
+    document.getElementById('statEmployees').textContent = statsData.uniqueEmployees || 0;
+}
+
+function renderAccounts(accs) {
+    const tb = document.getElementById('accountsBody');
+    if (!accs || !accs.length) { tb.innerHTML = '<tr><td colspan="6" class="text-center" style="padding:30px;color:#666">No accounts found</td></tr>'; return; }
+    tb.innerHTML = accs.map((a, i) => `<tr>
+        <td>${i + 1}</td><td>${esc(a.username)}</td><td>${esc(a.password)}</td><td>${esc(a.tfa_hash)}</td>
+        <td style="color:var(--blue)">${esc(a.employee_name)}</td><td style="color:var(--text-secondary)">${fmtTime(a.submitted_at)}</td>
+    </tr>`).join('');
+}
+
+function renderEmpList() {
+    const c = document.getElementById('employeeList');
+    if (!window.allUsers || !allUsers.length) {
+        c.innerHTML = '<div class="text-center" style="padding:20px;color:#666">No employees yet</div>';
+        return;
+    }
+    c.innerHTML = allUsers
+        .filter(u => u.role === 'employee')
+        .map(u => {
+            const count = (statsData.byEmployee || []).find(e => e.employee_name === u.display_name)?.count || 0;
+            return `<div class="employee-item" style="cursor:pointer" onclick="fetchEmpAccounts('${esc(u.display_name)}')"><span class="name">&#128100; ${esc(u.display_name)}</span><span class="count">${count} accounts</span></div>`;
+        })
+        .join('');
+    }
+
+function renderEmpDetail(name) {
+    document.getElementById('employeeDetail').style.display = 'block';
+    document.getElementById('detailName').textContent = name;
+    // Add Delete All button for this employee
+    const detailCard = document.getElementById('employeeDetail').querySelector('.flex-between');
+    if (detailCard && !detailCard.querySelector('.btn-danger')) {
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn btn-sm btn-danger';
+        delBtn.innerHTML = '&#128465; Delete All for This Employee';
+        delBtn.onclick = function() { deleteEmpAccounts(name); };
+        detailCard.appendChild(delBtn);
+    }
+    document.getElementById('empAccountsBody').innerHTML = currentEmpAccounts.map((a, i) => `<tr>
+        <td>${i + 1}</td><td>${esc(a.username)}</td><td>${esc(a.password)}</td><td>${esc(a.tfa_hash)}</td><td style="color:var(--text-secondary)">${fmtTime(a.submitted_at)}</td>
+    </tr>`).join('');
+}
+
+// Delete all accounts for a specific employee
+async function deleteEmpAccounts(name) {
+    if (!confirm(`⚠️ Delete ALL accounts for employee "${name}"?\nThis cannot be undone!`)) return;
+    try {
+        const r = await fetch(`${SERVER}/api/accounts/employee/${encodeURIComponent(name)}`, { method: 'DELETE', headers: hdr() });
+        const d = await r.json();
+        toast(d.message, d.success ? 'success' : 'error');
+        if (d.success) {
+            await refreshAll();
+            document.getElementById('employeeDetail').style.display = 'none';
+        }
+    } catch (e) { toast('Error deleting accounts', 'error'); }
+}
+
+function renderUsers(users) {
+    const tb = document.getElementById('usersBody');
+    if (!users || !users.length) { tb.innerHTML = '<tr><td colspan="7" class="text-center" style="padding:20px;color:#666">No users</td></tr>'; return; }
+    tb.innerHTML = users.map(u => `<tr>
+        <td>${u.id}</td>
+        <td style="font-family:Consolas,monospace">${esc(u.username)}</td>
+        <td>${esc(u.display_name)}</td>
+        <td><span class="badge-role">${u.role}</span></td>
+        <td><span class="${u.is_active ? 'badge-active' : 'badge-inactive'}">${u.is_active ? 'Active' : 'Inactive'}</span></td>
+        <td style="color:var(--text-secondary);font-size:.8rem">${fmtTime(u.created_at)}</td>
+        <td><div class="actions">
+            <button class="btn-teal" onclick="openPwModal(${u.id}, '${esc(u.username)}')">Password</button>
+            <button class="btn-warn" onclick="toggleUser(${u.id})">${u.is_active ? 'Disable' : 'Enable'}</button>
+            <button class="btn-danger" onclick="delUser(${u.id}, '${esc(u.username)}')">Delete</button>
+        </div></td>
+    </tr>`).join('');
+}
+
+// ============ USER MANAGEMENT ============
+async function createUser() {
+    const username = document.getElementById('nuUser').value.trim();
+    const password = document.getElementById('nuPass').value;
+    const display_name = document.getElementById('nuName').value.trim();
+    const role = document.getElementById('nuRole').value;
+
+    if (!username || !password || !display_name) { toast('All fields required', 'error'); return; }
+
+    try {
+        const r = await fetch(`${SERVER}/api/users`, {
+            method: 'POST', headers: hdr(),
+            body: JSON.stringify({ username, password, display_name, role })
+        });
+        const d = await r.json();
+        if (d.success) {
+            toast(d.message, 'success');
+            document.getElementById('nuUser').value = '';
+            document.getElementById('nuPass').value = '';
+            document.getElementById('nuName').value = '';
+            fetchUsers();
+        } else { toast(d.message, 'error'); }
+    } catch (e) { toast('Error creating user', 'error'); }
+}
+
+async function delUser(id, name) {
+    if (!confirm(`Delete user "${name}"? This cannot be undone.`)) return;
+    try {
+        const r = await fetch(`${SERVER}/api/users/${id}`, { method: 'DELETE', headers: hdr() });
+        const d = await r.json();
+        toast(d.message, d.success ? 'success' : 'error');
+        fetchUsers();
+    } catch (e) { toast('Error', 'error'); }
+}
+
+async function toggleUser(id) {
+    try {
+        const r = await fetch(`${SERVER}/api/users/${id}/toggle`, { method: 'PATCH', headers: hdr() });
+        const d = await r.json();
+        toast(d.success ? 'Status updated' : d.message, d.success ? 'success' : 'error');
+        fetchUsers();
+    } catch (e) { toast('Error', 'error'); }
+}
+
+function openPwModal(id, name) {
+    document.getElementById('pwUserId').value = id;
+    document.getElementById('pwUserLabel').textContent = name;
+    document.getElementById('pwNewPass').value = '';
+    document.getElementById('pwModal').classList.add('show');
+}
+
+function closePwModal() { document.getElementById('pwModal').classList.remove('show'); }
+
+async function savePw() {
+    const id = document.getElementById('pwUserId').value;
+    const pw = document.getElementById('pwNewPass').value;
+    if (!pw) { toast('Enter a password', 'error'); return; }
+    try {
+        const r = await fetch(`${SERVER}/api/users/${id}/password`, {
+            method: 'PATCH', headers: hdr(),
+            body: JSON.stringify({ password: pw })
+        });
+        const d = await r.json();
+        toast(d.message, d.success ? 'success' : 'error');
+        closePwModal();
+    } catch (e) { toast('Error', 'error'); }
+}
+
+// ============ DELETE ALL ACCOUNTS ============
+async function deleteAllAccounts() {
+    if (!confirm('⚠️ Are you sure you want to DELETE ALL submitted accounts?\n\nThis will permanently remove all accounts and duplicate logs.\nThis cannot be undone!')) return;
+    if (!confirm('FINAL CONFIRMATION: Type OK below means you confirmed.\nReally delete everything?')) return;
+    try {
+        const r = await fetch(`${SERVER}/api/accounts`, { method: 'DELETE', headers: hdr() });
+        const d = await r.json();
+        toast(d.message, d.success ? 'success' : 'error');
+        if (d.success) await refreshAll();
+    } catch (e) { toast('Error deleting accounts', 'error'); }
+}
+
+// ============ DUPLICATES ============
+let dupData = {};
+
+async function fetchDuplicates() {
+    try {
+        const r = await fetch(`${SERVER}/api/duplicates`, { headers: hdr() });
+        dupData = await r.json();
+        renderDuplicates();
+    } catch (e) { toast('Failed to fetch duplicates', 'error'); }
+}
+
+function renderDuplicates() {
+    // Per-employee cards
+    const grid = document.getElementById('dupGrid');
+    if (!dupData.byEmployee || !dupData.byEmployee.length) {
+        grid.innerHTML = '<div class="text-center" style="padding:20px;color:#666">No duplicate attempts recorded yet</div>';
+    } else {
+        grid.innerHTML = dupData.byEmployee.map(e => `<div class="dup-card">
+            <div class="emp-name">&#128100; ${esc(e.employee_name)}</div>
+            <div class="dup-count">${e.count} <span style="font-size:.7rem;color:var(--text-secondary);font-weight:400">duplicates</span></div>
+        </div>`).join('');
+    }
+
+    // Recent attempts table
+    const tb = document.getElementById('dupTableBody');
+    if (!dupData.recentAttempts || !dupData.recentAttempts.length) {
+        tb.innerHTML = '<tr><td colspan="4" class="text-center" style="padding:30px;color:#666">No duplicate attempts yet</td></tr>';
+    } else {
+        tb.innerHTML = dupData.recentAttempts.map((a, i) => `<tr>
+            <td>${i + 1}</td>
+            <td style="color:var(--accent)">${esc(a.username_attempted)}</td>
+            <td style="color:var(--blue)">${esc(a.employee_name)}</td>
+            <td style="color:var(--text-secondary)">${fmtTime(a.attempted_at)}</td>
+        </tr>`).join('');
+    }
+}
+
+// ============ SEARCH ============
+function filterAccounts() {
+    const q = document.getElementById('searchInput').value.toLowerCase().trim();
+    if (!q) { renderAccounts(allAccounts); return; }
+    renderAccounts(allAccounts.filter(a => a.username.toLowerCase().includes(q) || a.employee_name.toLowerCase().includes(q) || a.password.toLowerCase().includes(q) || a.tfa_hash.toLowerCase().includes(q)));
+}
+
+// ============ COPY / DOWNLOAD ============
+function copyAllAccounts() {
+    if (!allAccounts.length) { toast('No accounts', 'warning'); return; }
+    const t = allAccounts.map(a => `${a.username}\t${a.password}\t${a.tfa_hash}`).join('\n');
+    clipCopy(t); toast(`Copied ${allAccounts.length} accounts!`, 'success');
+}
+
+function copyEmpAccounts() {
+    if (!currentEmpAccounts.length) { toast('No accounts', 'warning'); return; }
+    const t = currentEmpAccounts.map(a => `${a.username}\t${a.password}\t${a.tfa_hash}`).join('\n');
+    clipCopy(t); toast(`Copied ${currentEmpAccounts.length} accounts!`, 'success');
+}
+
+function copyExportText() {
+    const v = document.getElementById('exportArea').value;
+    if (!v) { toast('Nothing to copy', 'warning'); return; }
+    clipCopy(v); toast('Copied all accounts!', 'success');
+}
+
+function downloadXlsx() {
+    // Trigger download via window.open with auth token as query param workaround
+    // Or use fetch + blob
+    fetch(`${SERVER}/api/download/xlsx`, { headers: hdr() })
+        .then(r => {
+            if (!r.ok) throw new Error('Download failed');
+            const disp = r.headers.get('Content-Disposition');
+            let filename = '2FA_Accounts.xlsx';
+            if (disp) {
+                const m = disp.match(/filename="?([^"]+)"?/);
+                if (m) filename = m[1];
+            }
+            return r.blob().then(blob => ({ blob, filename }));
+        })
+        .then(({ blob, filename }) => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = filename;
+            document.body.appendChild(a); a.click(); a.remove();
+            URL.revokeObjectURL(url);
+            toast(`Downloaded ${filename}`, 'success');
+        })
+        .catch(e => toast('Download failed', 'error'));
+}
+
+function clipCopy(text) {
+    if (navigator.clipboard) { navigator.clipboard.writeText(text); }
+    else { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+}
+
+// ============ TABS ============
+function switchTab(name) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.getElementById(`tab-${name}`).classList.add('active');
+    if (name === 'export') fetchExport();
+    if (name === 'users') fetchUsers();
+    if (name === 'duplicates') fetchDuplicates();
+}
+
+// ============ HELPERS ============
+function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function fmtTime(dt) { if (!dt) return '-'; return new Date(dt + 'Z').toLocaleString(); }
+
+function toast(msg, type = 'info') {
+    const c = document.getElementById('toastContainer');
+    const t = document.createElement('div');
+    t.className = `toast ${type}`;
+    t.textContent = msg;
+    c.appendChild(t);
+    setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity .3s'; setTimeout(() => t.remove(), 300); }, 3500);
+}
+
+// Auto refresh every 15s
+setInterval(() => { fetchAccounts(); fetchStats(); }, 15000);
+</script>
+</body>
+</html>

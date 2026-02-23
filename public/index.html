@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2FA System - Login</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .login-page{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg-primary)}
+        .login-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:40px 36px;width:400px;max-width:92vw;box-shadow:0 8px 48px rgba(0,0,0,.6)}
+        .login-card h1{text-align:center;color:var(--text-bright);font-size:1.5rem;margin-bottom:6px}
+        .login-card h1 span{color:var(--accent)}
+        .login-card .subtitle{text-align:center;color:var(--text-secondary);font-size:.85rem;margin-bottom:28px}
+        .login-card .field{margin-bottom:16px}
+        .login-card .field label{display:block;font-size:.78rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+        .login-card .field input{width:100%;padding:11px 14px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-bright);font-size:.95rem;outline:none;transition:.3s}
+        .login-card .field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(233,69,96,.15)}
+        .login-card .field input::placeholder{color:#4a4a6a}
+        .login-card .err{color:var(--accent);font-size:.84rem;text-align:center;margin-bottom:12px;min-height:22px}
+        .login-card .btn-login{width:100%;padding:13px;font-size:1rem}
+    </style>
+</head>
+<body>
+<div class="login-page">
+    <div class="login-card">
+        <h1>&#128274; 2FA <span>System</span></h1>
+        <p class="subtitle">Admin Login</p>
+        <div class="field">
+            <label>Username</label>
+            <input type="text" id="loginUser" placeholder="admin" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="field">
+            <label>Password</label>
+            <input type="password" id="loginPass" placeholder="Enter password">
+        </div>
+        <div class="err" id="loginErr"></div>
+        <button class="btn btn-primary btn-login" onclick="doLogin()">&#128275; LOGIN</button>
+    </div>
+</div>
+<script>
+const SERVER = window.location.origin;
+
+// If already logged in, redirect
+(function checkSession() {
+    const token = localStorage.getItem('admin_token');
+    if (token) {
+        fetch(`${SERVER}/api/auth/me`, { headers: { 'Authorization': `Bearer ${token}` } })
+            .then(r => r.json())
+            .then(d => { if (d.success && d.user.role === 'admin') window.location.href = '/admin'; })
+            .catch(() => {});
+    }
+})();
+
+async function doLogin() {
+    const user = document.getElementById('loginUser').value.trim();
+    const pass = document.getElementById('loginPass').value;
+    const err = document.getElementById('loginErr');
+    err.textContent = '';
+
+    if (!user || !pass) { err.textContent = 'Username and password required'; return; }
+
+    try {
+        const resp = await fetch(`${SERVER}/api/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: user, password: pass })
+        });
+        const data = await resp.json();
+
+        if (data.success) {
+            if (data.user.role !== 'admin') { err.textContent = 'Admin access only. Use the employee app.'; return; }
+            localStorage.setItem('admin_token', data.token);
+            localStorage.setItem('admin_user', JSON.stringify(data.user));
+            window.location.href = '/admin';
+        } else {
+            err.textContent = data.message || 'Login failed';
+        }
+    } catch (e) {
+        err.textContent = 'Server error. Check connection.';
+    }
+}
+
+document.addEventListener('keydown', e => {
+    if (e.key === 'Enter') doLogin();
+});
+</script>
+</body>
+</html>

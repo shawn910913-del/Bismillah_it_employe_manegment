@@ -1,0 +1,4 @@
+node_modules/
+accounts.db
+*.db
+.env

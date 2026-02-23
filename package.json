@@ -1,0 +1,16 @@
+{
+  "name": "2fa-accounts-manager",
+  "version": "1.0.0",
+  "description": "2FA Account Submission System with offline sync",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "sql.js": "^1.10.3",
+    "cors": "^2.8.5",
+    "xlsx": "^0.18.5"
+  }
+}
