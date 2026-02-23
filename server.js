@@ -42,7 +42,7 @@ const PORT = process.env.PORT || 3000;
 
 // ============ RATE LIMITING ============
 const loginAttempts = new Map(); // ip -> { count, lastAttempt }
-const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes
+const RATE_LIMIT_WINDOW = 1 * 60 * 1000; // 1 minute
 const MAX_LOGIN_ATTEMPTS = 100;
 
 function checkRateLimit(ip) {
