@@ -24,7 +24,7 @@
 <div class="login-page">
     <div class="login-card">
         <h1>&#128274; 2FA <span>System</span></h1>
-        <p class="subtitle">Admin Login</p>
+        <p class="subtitle">Login</p>
         <div class="field">
             <label>Username</label>
             <input type="text" id="loginUser" placeholder="admin" autocomplete="off" spellcheck="false">
@@ -42,11 +42,16 @@ const SERVER = window.location.origin;
 
 // If already logged in, redirect
 (function checkSession() {
-    const token = localStorage.getItem('admin_token');
+    const token = localStorage.getItem('admin_token') || localStorage.getItem('emp_token');
     if (token) {
         fetch(`${SERVER}/api/auth/me`, { headers: { 'Authorization': `Bearer ${token}` } })
             .then(r => r.json())
-            .then(d => { if (d.success && d.user.role === 'admin') window.location.href = '/admin'; })
+            .then(d => {
+                if (d.success) {
+                    if (d.user.role === 'admin') window.location.href = '/admin';
+                    else window.location.href = '/employee.html';
+                }
+            })
             .catch(() => {});
     }
 })();
@@ -68,10 +73,15 @@ async function doLogin() {
         const data = await resp.json();
 
         if (data.success) {
-            if (data.user.role !== 'admin') { err.textContent = 'Admin access only. Use the employee app.'; return; }
-            localStorage.setItem('admin_token', data.token);
-            localStorage.setItem('admin_user', JSON.stringify(data.user));
-            window.location.href = '/admin';
+            if (data.user.role === 'admin') {
+                localStorage.setItem('admin_token', data.token);
+                localStorage.setItem('admin_user', JSON.stringify(data.user));
+                window.location.href = '/admin';
+            } else {
+                localStorage.setItem('emp_token', data.token);
+                localStorage.setItem('emp_user', JSON.stringify(data.user));
+                window.location.href = '/employee.html';
+            }
         } else {
             err.textContent = data.message || 'Login failed';
         }
