@@ -103,7 +103,23 @@
             <span id="statusText">Checking...</span>
         </div>
         <span class="uname" id="displayName"></span>
+        <button class="btn btn-sm btn-blue" onclick="showPwModal()" title="Change Password">&#128272;</button>
         <button class="btn btn-sm btn-accent" onclick="doLogout()">Logout</button>
+    </div>
+</div>
+
+<!-- ===== PASSWORD CHANGE MODAL ===== -->
+<div id="pwOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:28px;width:360px;max-width:92vw;box-shadow:0 8px 40px rgba(0,0,0,.5)">
+        <h3 style="color:var(--white);margin-bottom:16px">&#128272; Change Password</h3>
+        <div style="margin-bottom:12px"><label style="display:block;font-size:.78rem;color:var(--dim);text-transform:uppercase;margin-bottom:5px">Current Password</label><input type="password" id="pwCurrent" placeholder="Enter current password" style="width:100%;padding:10px 13px;background:var(--input);border:1px solid var(--border);border-radius:var(--radius);color:var(--white);font-size:.9rem;outline:none"></div>
+        <div style="margin-bottom:12px"><label style="display:block;font-size:.78rem;color:var(--dim);text-transform:uppercase;margin-bottom:5px">New Password</label><input type="password" id="pwNew" placeholder="Enter new password" style="width:100%;padding:10px 13px;background:var(--input);border:1px solid var(--border);border-radius:var(--radius);color:var(--white);font-size:.9rem;outline:none"></div>
+        <div style="margin-bottom:12px"><label style="display:block;font-size:.78rem;color:var(--dim);text-transform:uppercase;margin-bottom:5px">Confirm New Password</label><input type="password" id="pwConfirm" placeholder="Confirm new password" style="width:100%;padding:10px 13px;background:var(--input);border:1px solid var(--border);border-radius:var(--radius);color:var(--white);font-size:.9rem;outline:none"></div>
+        <div id="pwErr" style="color:var(--accent);font-size:.82rem;text-align:center;margin-bottom:10px;min-height:20px"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn-sm" style="background:var(--border);color:var(--white)" onclick="hidePwModal()">Cancel</button>
+            <button class="btn btn-sm btn-green" onclick="changeMyPassword()">Save</button>
+        </div>
     </div>
 </div>
 
@@ -165,6 +181,28 @@
         <div class="stat y"><div class="num" id="sDup">0</div><div class="lbl">Duplicates</div></div>
         <div class="stat b"><div class="num" id="sPend">0</div><div class="lbl">Pending Sync</div></div>
     </div>
+    <div style="text-align:right;font-size:.72rem;color:var(--dim);margin-top:-12px;margin-bottom:12px">Last refreshed: <span id="lastRefresh">-</span></div>
+
+    <!-- PROFILE & ANALYTICS -->
+    <div class="card" id="profileCard" style="display:none">
+        <div class="card-title">&#128100; My Profile & Analytics</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px">
+            <div class="stat g" style="padding:12px"><div class="num" id="profValid" style="font-size:1.5rem">0</div><div class="lbl">Valid Accounts</div></div>
+            <div class="stat" style="padding:12px"><div class="num" id="profFlagged" style="font-size:1.5rem;color:var(--accent)">0</div><div class="lbl">Flagged</div></div>
+            <div class="stat" style="padding:12px"><div class="num" id="profRate" style="font-size:1.5rem;color:var(--blue)">0</div><div class="lbl">Rate/Account</div></div>
+            <div class="stat" style="padding:12px"><div class="num" id="profBalance" style="font-size:1.5rem;color:var(--green)">0</div><div class="lbl">Balance</div></div>
+        </div>
+        <!-- Flagged accounts list -->
+        <div id="flaggedSection" style="display:none;margin-top:14px">
+            <div style="font-size:.85rem;color:var(--accent);font-weight:600;margin-bottom:8px">&#9888; Flagged Accounts:</div>
+            <div style="overflow-x:auto">
+                <table>
+                    <thead><tr><th>#</th><th>Username</th><th>Reason</th><th>Submitted</th></tr></thead>
+                    <tbody id="flaggedBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 
     <!-- HISTORY -->
     <div class="card">
@@ -212,6 +250,63 @@ async function fetchMyStats() {
                 }));
                 renderHist();
                 updateStats();
+                document.getElementById('lastRefresh').textContent = new Date().toLocaleTimeString();
+            }
+        }
+    } catch (e) {}
+}
+
+// Password change
+function showPwModal() { document.getElementById('pwOverlay').style.display = 'flex'; document.getElementById('pwErr').textContent = ''; }
+function hidePwModal() { document.getElementById('pwOverlay').style.display = 'none'; document.getElementById('pwCurrent').value = ''; document.getElementById('pwNew').value = ''; document.getElementById('pwConfirm').value = ''; }
+async function changeMyPassword() {
+    const current = document.getElementById('pwCurrent').value;
+    const newPw = document.getElementById('pwNew').value;
+    const confirm = document.getElementById('pwConfirm').value;
+    const err = document.getElementById('pwErr');
+    err.textContent = '';
+    if (!current || !newPw || !confirm) { err.textContent = 'All fields required'; return; }
+    if (newPw !== confirm) { err.textContent = 'Passwords do not match'; return; }
+    if (newPw.length < 4) { err.textContent = 'Password must be at least 4 characters'; return; }
+    try {
+        const resp = await fetch(`${SERVER}/api/auth/change-password`, {
+            method: 'PATCH', headers: authHeaders(),
+            body: JSON.stringify({ currentPassword: current, newPassword: newPw })
+        });
+        const data = await resp.json();
+        if (data.success) { toast('Password changed successfully!', 'ok'); hidePwModal(); }
+        else { err.textContent = data.message || 'Failed to change password'; }
+    } catch (e) { err.textContent = 'Server error'; }
+}
+
+// ============ PROFILE & ANALYTICS ============
+async function fetchMyProfile() {
+    try {
+        const resp = await fetch(`${SERVER}/api/my-profile`, { headers: authHeaders(), signal: AbortSignal.timeout(5000) });
+        if (resp.ok) {
+            const data = await resp.json();
+            if (data.success && data.profile) {
+                const p = data.profile;
+                document.getElementById('profileCard').style.display = 'block';
+                document.getElementById('profValid').textContent = p.validAccounts;
+                document.getElementById('profFlagged').textContent = p.flaggedAccounts;
+                document.getElementById('profRate').textContent = p.rate_per_account || 0;
+                document.getElementById('profBalance').textContent = p.balance;
+            }
+        }
+    } catch (e) {}
+    // Fetch flagged accounts
+    try {
+        const resp = await fetch(`${SERVER}/api/my-flagged`, { headers: authHeaders(), signal: AbortSignal.timeout(5000) });
+        if (resp.ok) {
+            const data = await resp.json();
+            if (data.success && data.flagged.length > 0) {
+                document.getElementById('flaggedSection').style.display = 'block';
+                document.getElementById('flaggedBody').innerHTML = data.flagged.map((a, i) =>
+                    `<tr><td>${i+1}</td><td style="color:var(--accent)">${esc(a.username)}</td><td style="color:var(--dim);font-size:.82rem">${esc(a.flag_reason||'-')}</td><td style="color:var(--dim);font-size:.82rem">${a.submitted_at||'-'}</td></tr>`
+                ).join('');
+            } else {
+                document.getElementById('flaggedSection').style.display = 'none';
             }
         }
     } catch (e) {}
@@ -314,6 +409,7 @@ function showApp() {
     document.getElementById('displayName').textContent = USER.display_name;
     startPolling();
     fetchMyStats();
+    fetchMyProfile();
 }
 
 function hideApp() {
@@ -532,11 +628,12 @@ document.addEventListener('keydown', e => {
 });
 
 // ============ POLLING ============
-let pingTimer, syncTimer;
+let pingTimer, syncTimer, refreshTimer;
 function startPolling() {
     ping(); updateStats();
     pingTimer = setInterval(async () => { await ping(); await updateStats(); }, PING_MS);
     syncTimer = setInterval(() => syncPending(), SYNC_MS);
+    refreshTimer = setInterval(() => { fetchMyStats(); fetchMyProfile(); }, 15000); // auto-refresh every 15s
     syncPending();
 }
 

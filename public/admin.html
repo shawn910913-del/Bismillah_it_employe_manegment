@@ -19,7 +19,22 @@
         .badge-active{background:rgba(0,230,118,.15);color:var(--green);padding:2px 10px;border-radius:10px;font-size:.78rem;border:1px solid var(--green)}
         .badge-inactive{background:rgba(233,69,96,.15);color:var(--accent);padding:2px 10px;border-radius:10px;font-size:.78rem;border:1px solid var(--accent)}
         .badge-role{background:rgba(68,138,255,.15);color:var(--blue);padding:2px 10px;border-radius:10px;font-size:.78rem;border:1px solid var(--blue)}
+        .badge-flagged{background:rgba(233,69,96,.15);color:var(--accent);padding:2px 10px;border-radius:10px;font-size:.78rem;border:1px solid var(--accent)}
         .download-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+        .flag-textarea{width:100%;min-height:160px;padding:12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-bright);font-family:Consolas,monospace;font-size:.88rem;resize:vertical;outline:none}
+        .flag-textarea:focus{border-color:var(--blue)}
+        .flag-textarea::placeholder{color:var(--text-secondary)}
+        .rate-input{width:80px;padding:6px 10px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-bright);font-size:.88rem;outline:none;text-align:center}
+        .rate-input:focus{border-color:var(--blue)}
+        .balance-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;text-align:center}
+        .balance-card .emp-name{color:var(--blue);font-weight:600;font-size:.95rem;margin-bottom:8px}
+        .balance-card .balance-amount{font-size:1.6rem;font-weight:700;color:var(--green)}
+        .balance-card .balance-detail{font-size:.78rem;color:var(--text-secondary);margin-top:4px}
+        .flag-result{background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-top:14px;display:none}
+        .flag-result .flag-stat{display:inline-block;margin-right:16px;font-size:.9rem}
+        .flag-result .flag-stat strong{color:var(--text-bright)}
+        .section-title{color:var(--text-bright);font-size:1rem;font-weight:600;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+        .report-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:18px}
         .dup-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px}
         .dup-card .emp-name{color:var(--blue);font-weight:600;font-size:1rem;margin-bottom:6px}
         .dup-card .dup-count{color:var(--accent);font-size:1.5rem;font-weight:700}
@@ -85,6 +100,10 @@
             <div class="stat-number" id="statEmployees">0</div>
             <div class="stat-label">Employees</div>
         </div>
+        <div class="stat-box" style="border-color:var(--accent)">
+            <div class="stat-number" id="statFlagged" style="color:var(--accent)">0</div>
+            <div class="stat-label">Flagged Accounts</div>
+        </div>
     </div>
 
     <!-- TABS -->
@@ -93,6 +112,8 @@
         <button class="tab-btn" data-tab="employees" onclick="switchTab('employees')">&#128101; By Employee</button>
         <button class="tab-btn" data-tab="duplicates" onclick="switchTab('duplicates')">&#9888; Duplicates</button>
         <button class="tab-btn" data-tab="users" onclick="switchTab('users')">&#128100; Manage Users</button>
+        <button class="tab-btn" data-tab="flagged" onclick="switchTab('flagged')">&#127988; Flagged</button>
+        <button class="tab-btn" data-tab="reports" onclick="switchTab('reports')">&#128200; Reports</button>
         <button class="tab-btn" data-tab="export" onclick="switchTab('export')">&#128229; Export</button>
     </div>
 
@@ -195,6 +216,73 @@
         </div>
     </div>
 
+    <!-- TAB: FLAGGED ACCOUNTS -->
+    <div class="tab-content" id="tab-flagged">
+        <div class="card">
+            <div class="card-title">&#127988; Submit Flagged Usernames</div>
+            <p style="color:var(--text-secondary);font-size:.85rem;margin-bottom:12px">
+                Paste flagged usernames below (one per line). The system will automatically detect which employee submitted each account and flag them.
+            </p>
+            <textarea class="flag-textarea" id="flagUsernames" placeholder="username1&#10;username2&#10;username3&#10;..."></textarea>
+            <div style="margin-top:12px;display:flex;gap:10px;align-items:center">
+                <div class="form-group" style="flex:1">
+                    <label style="display:block;font-size:.78rem;color:var(--text-secondary);text-transform:uppercase;margin-bottom:5px">Reason (optional)</label>
+                    <input type="text" id="flagReason" placeholder="e.g. Invalid account, Suspended, etc." style="width:100%;padding:9px 12px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-bright);font-size:.9rem;outline:none">
+                </div>
+                <button class="btn btn-primary" onclick="submitBulkFlag()" style="height:40px;margin-top:16px">&#127988; Flag Accounts</button>
+            </div>
+            <div class="flag-result" id="flagResult">
+                <div style="margin-bottom:8px;font-weight:600;color:var(--text-bright)">&#9989; Flag Results:</div>
+                <div>
+                    <span class="flag-stat">Flagged: <strong id="frFlagged" style="color:var(--accent)">0</strong></span>
+                    <span class="flag-stat">Already Flagged: <strong id="frAlready" style="color:var(--yellow)">0</strong></span>
+                    <span class="flag-stat">Not Found: <strong id="frNotFound" style="color:var(--text-secondary)">0</strong></span>
+                </div>
+                <div id="frDetails" style="margin-top:10px;font-size:.82rem;color:var(--text-secondary)"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="flex-between mb-10">
+                <div class="card-title" style="margin:0;border:none;padding:0">&#128683; All Flagged Accounts</div>
+                <button class="btn btn-sm btn-warn" onclick="unflagAll()">&#9888; Unflag All</button>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead><tr><th>#</th><th>Username</th><th>Employee</th><th>Reason</th><th>Submitted</th></tr></thead>
+                    <tbody id="flaggedBody"><tr><td colspan="5" class="text-center" style="padding:30px;color:#666">Loading...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB: REPORTS -->
+    <div class="tab-content" id="tab-reports">
+        <div class="card">
+            <div class="card-title">&#128176; Employee Balance & Rate Settings</div>
+            <p style="color:var(--text-secondary);font-size:.85rem;margin-bottom:16px">
+                Set rate per valid account for each employee. Balance = (Valid Accounts) &times; Rate. Flagged accounts are excluded.
+            </p>
+            <div class="table-wrapper">
+                <table class="user-table">
+                    <thead><tr><th>Employee</th><th>Total</th><th>Valid</th><th>Flagged</th><th>Duplicates</th><th>Rate/Account</th><th>Balance</th><th></th></tr></thead>
+                    <tbody id="profilesBody"><tr><td colspan="8" class="text-center" style="padding:30px;color:#666">Loading...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">&#128200; Flag Report Summary</div>
+            <div id="flagReportSummary" style="margin-bottom:16px">
+                <div class="text-center" style="padding:20px;color:#666">Loading...</div>
+            </div>
+            <div class="section-title">Flagged Per Employee</div>
+            <div class="report-grid" id="flagReportGrid">
+                <div class="text-center" style="padding:20px;color:#666">Loading...</div>
+            </div>
+        </div>
+    </div>
+
     <!-- TAB: EXPORT -->
     <div class="tab-content" id="tab-export">
         <div class="card">
@@ -274,7 +362,7 @@ async function fetchEmpAccounts(name) {
 }
 
 async function refreshAll() {
-    await Promise.all([fetchAccounts(), fetchStats(), fetchExport(), fetchUsers(), fetchDuplicates()]);
+    await Promise.all([fetchAccounts(), fetchStats(), fetchExport(), fetchUsers(), fetchDuplicates(), fetchFlaggedAccounts(), fetchEmployeeProfiles(), fetchFlagReport()]);
 }
 
 // ============ RENDER ============
@@ -282,6 +370,8 @@ function renderStats() {
     document.getElementById('statTotal').textContent = statsData.totalAccounts || 0;
     document.getElementById('statDuplicates').textContent = statsData.totalDuplicateAttempts || 0;
     document.getElementById('statEmployees').textContent = statsData.uniqueEmployees || 0;
+    // Update flagged count from flagReport or flaggedAccounts
+    if (window.flagReportData) document.getElementById('statFlagged').textContent = window.flagReportData.totalFlagged || 0;
 }
 
 function renderAccounts(accs) {
@@ -558,6 +648,8 @@ function switchTab(name) {
     if (name === 'export') fetchExport();
     if (name === 'users') fetchUsers();
     if (name === 'duplicates') fetchDuplicates();
+    if (name === 'flagged') fetchFlaggedAccounts();
+    if (name === 'reports') { fetchEmployeeProfiles(); fetchFlagReport(); }
 }
 
 // ============ HELPERS ============
@@ -573,8 +665,181 @@ function toast(msg, type = 'info') {
     setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity .3s'; setTimeout(() => t.remove(), 300); }, 3500);
 }
 
+// ============ FLAGGING ============
+let flaggedAccounts = [];
+
+async function fetchFlaggedAccounts() {
+    try {
+        const r = await fetch(`${SERVER}/api/flagged`, { headers: hdr() });
+        flaggedAccounts = await r.json();
+        renderFlaggedTable();
+    } catch (e) { toast('Failed to fetch flagged accounts', 'error'); }
+}
+
+function renderFlaggedTable() {
+    const tb = document.getElementById('flaggedBody');
+    if (!flaggedAccounts || !flaggedAccounts.length) {
+        tb.innerHTML = '<tr><td colspan="5" class="text-center" style="padding:30px;color:#666">No flagged accounts</td></tr>';
+        return;
+    }
+    tb.innerHTML = flaggedAccounts.map((a, i) => `<tr>
+        <td>${i + 1}</td>
+        <td style="color:var(--accent)">${esc(a.username)}</td>
+        <td style="color:var(--blue)">${esc(a.employee_name)}</td>
+        <td style="color:var(--text-secondary)">${esc(a.flag_reason || '-')}</td>
+        <td style="color:var(--text-secondary);font-size:.8rem">${fmtTime(a.submitted_at)}</td>
+    </tr>`).join('');
+}
+
+async function submitBulkFlag() {
+    const text = document.getElementById('flagUsernames').value.trim();
+    if (!text) { toast('Paste usernames first', 'error'); return; }
+    const usernames = text.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+    if (!usernames.length) { toast('No valid usernames found', 'error'); return; }
+
+    const reason = document.getElementById('flagReason').value.trim() || 'Flagged by admin';
+
+    try {
+        const r = await fetch(`${SERVER}/api/accounts/bulk-flag`, {
+            method: 'POST', headers: hdr(),
+            body: JSON.stringify({ usernames, reason })
+        });
+        const d = await r.json();
+        if (d.success) {
+            document.getElementById('frFlagged').textContent = d.flagged;
+            document.getElementById('frAlready').textContent = d.alreadyFlagged;
+            document.getElementById('frNotFound').textContent = d.notFound;
+
+            let details = '';
+            if (d.flaggedList && d.flaggedList.length) {
+                details += '<div style="margin-top:6px"><strong style="color:var(--accent)">Newly flagged:</strong><br>' +
+                    d.flaggedList.map(f => `${esc(f.username)} → ${esc(f.employee_name)}`).join('<br>') + '</div>';
+            }
+            if (d.notFoundList && d.notFoundList.length) {
+                details += '<div style="margin-top:6px"><strong style="color:var(--text-secondary)">Not found:</strong><br>' +
+                    d.notFoundList.join(', ') + '</div>';
+            }
+            document.getElementById('frDetails').innerHTML = details;
+            document.getElementById('flagResult').style.display = 'block';
+
+            toast(d.message, 'success');
+            document.getElementById('flagUsernames').value = '';
+            // Refresh data so balances update
+            await Promise.all([fetchFlaggedAccounts(), fetchEmployeeProfiles(), fetchFlagReport(), fetchStats()]);
+        } else {
+            toast(d.message || 'Flag failed', 'error');
+        }
+    } catch (e) { toast('Error flagging accounts', 'error'); }
+}
+
+async function unflagAll() {
+    if (!confirm('⚠️ Unflag ALL flagged accounts? This will restore all balances.')) return;
+    try {
+        const r = await fetch(`${SERVER}/api/accounts/unflag-all`, { method: 'POST', headers: hdr() });
+        const d = await r.json();
+        toast(d.message, d.success ? 'success' : 'error');
+        if (d.success) await Promise.all([fetchFlaggedAccounts(), fetchEmployeeProfiles(), fetchFlagReport(), fetchStats()]);
+    } catch (e) { toast('Error unflagging', 'error'); }
+}
+
+// ============ EMPLOYEE PROFILES & RATES ============
+let employeeProfiles = [];
+
+async function fetchEmployeeProfiles() {
+    try {
+        const r = await fetch(`${SERVER}/api/employee-profiles`, { headers: hdr() });
+        employeeProfiles = await r.json();
+        renderProfiles();
+    } catch (e) { toast('Failed to fetch profiles', 'error'); }
+}
+
+function renderProfiles() {
+    const tb = document.getElementById('profilesBody');
+    if (!employeeProfiles || !employeeProfiles.length) {
+        tb.innerHTML = '<tr><td colspan="8" class="text-center" style="padding:20px;color:#666">No employees</td></tr>';
+        return;
+    }
+    tb.innerHTML = employeeProfiles.map(emp => `<tr>
+        <td style="color:var(--blue);font-weight:600">&#128100; ${esc(emp.display_name)}
+            <span class="${emp.is_active ? 'badge-active' : 'badge-inactive'}" style="margin-left:6px;font-size:.7rem">${emp.is_active ? 'Active' : 'Inactive'}</span>
+        </td>
+        <td>${emp.totalAccounts}</td>
+        <td style="color:var(--green);font-weight:600">${emp.validAccounts}</td>
+        <td style="color:var(--accent);font-weight:600">${emp.flaggedAccounts}</td>
+        <td style="color:var(--yellow)">${emp.duplicateAttempts}</td>
+        <td>
+            <input type="number" class="rate-input" id="rate-${emp.id}" value="${emp.rate_per_account || 0}" min="0" step="0.01">
+        </td>
+        <td style="font-size:1.1rem;font-weight:700;color:var(--green)">৳${emp.balance.toFixed(2)}</td>
+        <td>
+            <button class="btn-teal" style="padding:5px 12px;font-size:.78rem;border:none;cursor:pointer;border-radius:6px;font-weight:600" onclick="saveRate(${emp.id})">Save Rate</button>
+        </td>
+    </tr>`).join('');
+}
+
+async function saveRate(userId) {
+    const input = document.getElementById(`rate-${userId}`);
+    const rate = parseFloat(input.value);
+    if (isNaN(rate) || rate < 0) { toast('Enter a valid rate >= 0', 'error'); return; }
+    try {
+        const r = await fetch(`${SERVER}/api/users/${userId}/rate`, {
+            method: 'PATCH', headers: hdr(),
+            body: JSON.stringify({ rate })
+        });
+        const d = await r.json();
+        toast(d.message, d.success ? 'success' : 'error');
+        if (d.success) await fetchEmployeeProfiles();
+    } catch (e) { toast('Error saving rate', 'error'); }
+}
+
+// ============ FLAG REPORT ============
+async function fetchFlagReport() {
+    try {
+        const r = await fetch(`${SERVER}/api/flag-report`, { headers: hdr() });
+        window.flagReportData = await r.json();
+        renderFlagReport();
+        // Update stat card
+        document.getElementById('statFlagged').textContent = window.flagReportData.totalFlagged || 0;
+    } catch (e) { toast('Failed to fetch flag report', 'error'); }
+}
+
+function renderFlagReport() {
+    const data = window.flagReportData;
+    const summary = document.getElementById('flagReportSummary');
+    summary.innerHTML = `
+        <div class="stats-row" style="margin-bottom:0">
+            <div class="stat-box" style="border-color:var(--accent)">
+                <div class="stat-number" style="color:var(--accent)">${data.totalFlagged}</div>
+                <div class="stat-label">Total Flagged</div>
+            </div>
+            <div class="stat-box green">
+                <div class="stat-number">${employeeProfiles.reduce((s, e) => s + e.validAccounts, 0)}</div>
+                <div class="stat-label">Total Valid</div>
+            </div>
+            <div class="stat-box blue">
+                <div class="stat-number">৳${employeeProfiles.reduce((s, e) => s + e.balance, 0).toFixed(2)}</div>
+                <div class="stat-label">Total Balance</div>
+            </div>
+        </div>
+    `;
+
+    const grid = document.getElementById('flagReportGrid');
+    if (!data.byEmployee || !data.byEmployee.length) {
+        grid.innerHTML = '<div class="text-center" style="padding:20px;color:#666">No flagged accounts</div>';
+        return;
+    }
+    grid.innerHTML = data.byEmployee.map(e => {
+        const profile = employeeProfiles.find(p => p.display_name === e.employee_name);
+        return `<div class="balance-card">
+            <div class="emp-name">&#128100; ${esc(e.employee_name)}</div>
+            <div style="color:var(--accent);font-size:1.3rem;font-weight:700">${e.count} flagged</div>
+            ${profile ? `<div class="balance-detail">Valid: ${profile.validAccounts} | Balance: ৳${profile.balance.toFixed(2)}</div>` : ''}
+        </div>`;
+    }).join('');
+}
+
 // Auto refresh every 15s
-setInterval(() => { fetchAccounts(); fetchStats(); }, 15000);
+setInterval(() => { fetchAccounts(); fetchStats(); fetchFlagReport(); }, 15000);
 </script>
 </body>
 </html>
