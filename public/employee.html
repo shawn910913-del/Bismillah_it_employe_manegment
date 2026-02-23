@@ -194,6 +194,29 @@ let isOnline = false;
 let stats = { submitted: 0, duplicates: 0 };
 let history = [];
 
+// Fetch real stats from server on load
+async function fetchMyStats() {
+    try {
+        const resp = await fetch(`${SERVER}/api/my-accounts`, { headers: authHeaders(), signal: AbortSignal.timeout(5000) });
+        if (resp.ok) {
+            const data = await resp.json();
+            if (data.success) {
+                stats.submitted = data.total;
+                // Rebuild history from server data
+                history = data.accounts.map(a => ({
+                    username: a.username,
+                    password: a.password,
+                    tfa_hash: a.tfa_hash,
+                    status: 'synced',
+                    time: new Date(a.submitted_at).toLocaleTimeString()
+                }));
+                renderHist();
+                updateStats();
+            }
+        }
+    } catch (e) {}
+}
+
 // ============ IndexedDB ============
 const IDB_NAME = '2fa_offline_queue';
 const IDB_VER = 1;
@@ -290,6 +313,7 @@ function showApp() {
     document.getElementById('mainContent').style.display = 'block';
     document.getElementById('displayName').textContent = USER.display_name;
     startPolling();
+    fetchMyStats();
 }
 
 function hideApp() {

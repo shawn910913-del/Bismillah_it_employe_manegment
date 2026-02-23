@@ -160,6 +160,12 @@ app.get('/api/accounts/employee/:name', authMiddleware, adminOnly, (req, res) =>
     res.json(getAccountsByEmployee(req.params.name));
 });
 
+// Employee can view their own submissions and stats
+app.get('/api/my-accounts', authMiddleware, (req, res) => {
+    const accounts = getAccountsByEmployee(req.user.display_name);
+    res.json({ success: true, accounts, total: accounts.length });
+});
+
 app.get('/api/export', authMiddleware, adminOnly, (req, res) => {
     res.type('text/plain').send(exportAllAccounts());
 });
